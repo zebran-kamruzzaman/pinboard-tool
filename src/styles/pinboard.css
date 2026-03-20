@@ -1,0 +1,38 @@
+/* src/styles/pinboard.css */
+@import "tailwindcss";
+
+/* Custom Pinboard Design Tokens */
+@layer base {
+  :host {
+    --pb-bg: #1B1B1B;
+    --pb-border: #2C2C2C;
+    --pb-border-light: #4A4A4A;
+    --pb-text: #E8E8E8;
+    --pb-text-muted: #888888;
+    --pb-accent: #FFFFFF;
+    font-family: 'Courier Prime', 'Courier New', monospace;
+  }
+}
+
+/* Google Fonts import for Shadow DOM */
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Playfair+Display:wght@400;600&display=swap');
+
+/* Floating window base styles */
+.pb-window {
+  background: var(--pb-bg);
+  border: 1px solid var(--pb-border);
+  color: var(--pb-text);
+  font-family: 'Courier Prime', monospace;
+  position: fixed;
+  z-index: 2147483647;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+/* Drag handle cursor */
+.pb-drag-handle {
+  cursor: grab;
+}
+.pb-drag-handle:active {
+  cursor: grabbing;
+}
