@@ -7,8 +7,8 @@ export function usePins() {
 
   // ── Load initial pins on mount ─────────────────────────────────────────────
   useEffect(() => {
-    chrome.runtime.sendMessage({ action: 'GET_PINS' }, (response) => {
-      if (response?.pins) setPins(response.pins)
+    chrome.storage.local.get('pins', (result) => {
+      if (result.pins) setPins(result.pins as Pin[])
     })
   }, [])
 

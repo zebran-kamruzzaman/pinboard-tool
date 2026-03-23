@@ -1,13 +1,13 @@
 // src/components/PDFViewer.tsx
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 // Point PDF.js to its worker script
 // The worker must be a web-accessible resource
-pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL(
-  'node_modules/pdfjs-dist/build/pdf.worker.min.mjs'
-)
+pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.mjs')
+
 
 interface Props {
   src: string    // URL or base64 data URI
@@ -29,9 +29,18 @@ export default function PDFViewer({ src, height }: Props) {
 
     // PDF.js accepts URLs and binary data, but not raw data URIs directly
     // We need to strip the base64 prefix for local files
-    const loadingTask = src.startsWith('data:')
-      ? pdfjsLib.getDocument({ data: atob(src.split(',')[1]) })
-      : pdfjsLib.getDocument(src)
+    let loadingTask
+    if (src.startsWith('data:')) {
+      const base64 = src.split(',')[1]
+      const binary = atob(base64)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i)
+      }
+      loadingTask = pdfjsLib.getDocument({ data: bytes })
+    } else {
+      loadingTask = pdfjsLib.getDocument(src)
+    }
 
     loadingTask.promise
       .then((doc) => {
@@ -61,7 +70,7 @@ export default function PDFViewer({ src, height }: Props) {
       const ctx = canvas.getContext('2d')!
       // Scale to fill the window width
       const viewport = page.getViewport({ scale: 1 })
-      const containerWidth = canvas.parentElement?.clientWidth ?? 480
+      const containerWidth = canvas.parentElement?.clientWidth || canvas.parentElement?.offsetWidth || 480
       const scale = containerWidth / viewport.width
       const scaledViewport = page.getViewport({ scale })
 
@@ -79,8 +88,11 @@ export default function PDFViewer({ src, height }: Props) {
     setCurrentPage(Math.min(Math.max(1, n), totalPages))
   }
 
-  if (loading) return <PDFState label="Loading..." />
-  if (error)   return <PDFState label={error} isError />
+  if (loading || error) return (
+    <div style={{ display: 'flex', flexDirection: 'column', height }}>
+      <PDFState label={loading ? 'Loading...' : error!} isError={!!error} />
+    </div>
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height }}>
@@ -134,7 +146,7 @@ function PDFState({ label, isError }: { label: string; isError?: boolean }) {
 function NavButton({ onClick, disabled, children }: {
   onClick: () => void
   disabled: boolean
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <button

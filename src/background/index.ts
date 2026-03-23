@@ -72,7 +72,7 @@ chrome.runtime.onMessage.addListener(
           )
           await setPins(updated)
           sendResponse({ success: true })
-          // Don't broadcast position updates — too noisy, each tab manages its own
+          broadcastPinsUpdate(updated) 
           break
         }
 
@@ -100,3 +100,15 @@ async function broadcastPinsUpdate(pins: Pin[]) {
     }
   }
 }
+
+// Inject content script into tabs that were open before extension loaded
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content/index.js']
+    })
+  } catch {
+    // Tab already has the script or is a restricted page — ignore
+  }
+})

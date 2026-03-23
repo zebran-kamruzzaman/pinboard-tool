@@ -1,6 +1,9 @@
 /* src/styles/pinboard.css */
 @import "tailwindcss";
 
+/* Google Fonts import for Shadow DOM */
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Playfair+Display:wght@400;600&display=swap');
+
 /* Custom Pinboard Design Tokens */
 @layer base {
   :host {
@@ -13,9 +16,6 @@
     font-family: 'Courier Prime', 'Courier New', monospace;
   }
 }
-
-/* Google Fonts import for Shadow DOM */
-@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Playfair+Display:wght@400;600&display=swap');
 
 /* Floating window base styles */
 .pb-window {

@@ -24,14 +24,18 @@ export function useInteractionListeners({ addPin, setDropZoneVisible }: Options)
         const img = target as HTMLImageElement
         const src = img.src || img.currentSrc
 
+        // Use the image's natural dimensions, capped to reasonable maximums
+        const w = Math.min(Math.max(img.naturalWidth || 320, 100), 700)
+        const h = Math.min(Math.max(img.naturalHeight || 260, 100), 600)
+
         addPin({
           id: crypto.randomUUID(),
           type: 'image',
           src,
-          x: e.clientX - 160,
-          y: e.clientY - 60,
-          width: 320,
-          height: 260,
+          x: Math.max(0, e.clientX - w / 2),
+          y: Math.max(0, e.clientY - h / 2),
+          width: w,
+          height: h,
           minimized: false,
           label: src.split('/').pop()?.split('?')[0] ?? 'image',
         })

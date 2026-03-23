@@ -4,10 +4,11 @@
   "version": "1.0.0",
   "description": "Pin floating images and PDFs that persist across all browser tabs.",
 
-  "permissions": [
+  "permissions": [ 
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
 
   "host_permissions": [
@@ -23,7 +24,7 @@
     {
       "matches": ["<all_urls>"],
       "js": ["src/content/index.tsx"],
-      "run_at": "document_idle",
+      "run_at": "document_start",
       "all_frames": false
     }
   ],

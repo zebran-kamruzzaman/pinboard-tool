@@ -1,10 +1,10 @@
 // src/components/PinboardApp.tsx
 import { useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import FloatingWindow from './FloatingWindow.tsx'
-import DropZoneOverlay from './DropZoneOverlay.tsx'
-import { usePins } from '../hooks/usePins.ts'
-import { useInteractionListeners } from '../hooks/useInteractionListeners.ts'
+import FloatingWindow from './FloatingWindow'
+import DropZoneOverlay from './DropZoneOverlay'
+import { usePins } from '../hooks/usePins'
+import { useInteractionListeners } from '../hooks/useInteractionListeners'
 
 export default function PinboardApp() {
   const { pins, addPin, removePin, updatePin } = usePins()
