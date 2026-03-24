@@ -1,21 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { motion, useMotionValue } from 'framer-motion'
-import { GripHorizontal, X, Minus, Maximize2 } from 'lucide-react'
+import { GripHorizontal, X, Minus, Maximize2, Pin, PinOff } from 'lucide-react'
 import PDFViewer from './PDFViewer'
-import type { Pin } from '../background/index'
+import type { Pin as PinType } from '../background/index'
 
 interface Props {
-  pin: Pin
+  pin: PinType
+  zIndex: number                          // ← managed by PinboardApp
   onClose: () => void
-  onUpdate: (updates: Partial<Pin>) => void
+  onUpdate: (updates: Partial<PinType>) => void
+  onFocus: () => void                     // ← called on any interaction
 }
 
-export default function FloatingWindow({ pin, onClose, onUpdate }: Props) {
+export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus }: Props) {
   const x = useMotionValue(pin.x)
   const y = useMotionValue(pin.y)
   const [minimized, setMinimized] = useState(pin.minimized)
   const headerHeight = 28
+
 
   // Sync position when another tab broadcasts an update
   useEffect(() => { x.set(pin.x) }, [pin.x, x])
@@ -27,6 +30,12 @@ export default function FloatingWindow({ pin, onClose, onUpdate }: Props) {
     onUpdate({ minimized: next })
   }
 
+  const handleTogglePin = () => {
+    const next = !pin.pinnedToFront
+    onUpdate({ pinnedToFront: next })
+    onFocus() // elevate within the pinned tier immediately
+  }
+
   return (
     <motion.div
       className="pb-window"
@@ -35,11 +44,12 @@ export default function FloatingWindow({ pin, onClose, onUpdate }: Props) {
         x,
         y,
         width: pin.width,
-        zIndex: 2147483647,
+        zIndex,
       }}
       drag
       dragMomentum={false}
       dragElastic={0}
+      onMouseDown={onFocus}
       onDragEnd={() => {
         // x.get() / y.get() are the true final coordinates after drag
         onUpdate({ x: x.get(), y: y.get() })
@@ -73,16 +83,27 @@ export default function FloatingWindow({ pin, onClose, onUpdate }: Props) {
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
-              maxWidth: pin.width - 80,
+              maxWidth: pin.width - 100,
             }}>
               {pin.label}
             </span>
           )}
         </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {/* Pin-to-front toggle */}
+          <HeaderButton
+            onClick={handleTogglePin}
+            title={pin.pinnedToFront ? 'Unpin from front' : 'Pin to front'}
+            active={pin.pinnedToFront}
+          >
+            {pin.pinnedToFront ? <PinOff size={10} /> : <Pin size={10} />}
+          </HeaderButton>
+
           <HeaderButton onClick={handleMinimize} title={minimized ? 'Expand' : 'Minimize'}>
             {minimized ? <Maximize2 size={10} /> : <Minus size={10} />}
           </HeaderButton>
+
           <HeaderButton onClick={onClose} title="Close pin">
             <X size={10} />
           </HeaderButton>
@@ -121,9 +142,17 @@ export default function FloatingWindow({ pin, onClose, onUpdate }: Props) {
   )
 }
 
-function HeaderButton({ onClick, title, children }: {
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function HeaderButton({
+  onClick,
+  title,
+  active = false,
+  children,
+}: {
   onClick: () => void
   title: string
+  active?: boolean
   children: ReactNode
 }) {
   const [hovered, setHovered] = useState(false)
@@ -134,11 +163,12 @@ function HeaderButton({ onClick, title, children }: {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? '#2C2C2C' : 'transparent',
+        background: active ? '#2C2C2C' : hovered ? '#2C2C2C' : 'transparent',
         border: '1px solid',
-        borderColor: hovered ? '#4A4A4A' : 'transparent',
+        borderColor: active ? '#E8E8E8' : hovered ? '#4A4A4A' : 'transparent',
         borderRadius: 2,
-        color: hovered ? '#E8E8E8' : '#666',
+        // Active (pinned) state shows white, otherwise normal hover logic
+        color: active ? '#E8E8E8' : hovered ? '#E8E8E8' : '#666',
         cursor: 'pointer',
         width: 18, height: 18,
         display: 'flex',
@@ -153,7 +183,10 @@ function HeaderButton({ onClick, title, children }: {
   )
 }
 
-function ResizeHandle({ pin, onUpdate }: { pin: Pin; onUpdate: (u: Partial<Pin>) => void }) {
+function ResizeHandle({ pin, onUpdate }: {
+  pin: PinType
+  onUpdate: (u: Partial<PinType>) => void
+}) {
   const startRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
 
   return (

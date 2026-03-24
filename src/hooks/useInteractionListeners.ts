@@ -5,9 +5,10 @@ import type { Pin } from '../background/index'
 interface Options {
   addPin: (pin: Pin) => void
   setDropZoneVisible: (v: boolean) => void
+  setSnipActive: (v: boolean) => void
 }
 
-export function useInteractionListeners({ addPin, setDropZoneVisible }: Options) {
+export function useInteractionListeners({ addPin, setDropZoneVisible, setSnipActive }: Options) {
 
   // ── Alt + Click listener ──────────────────────────────────────────────────
   useEffect(() => {
@@ -66,7 +67,20 @@ export function useInteractionListeners({ addPin, setDropZoneVisible }: Options)
     return () => document.removeEventListener('click', handleClick, { capture: true })
   }, [addPin])
 
-  // ── Drag-and-Drop listener ────────────────────────────────────────────────
+  // ── Alt + Shift + S: activate snip tool ───────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.shiftKey && e.key === 'S') {
+        e.preventDefault()
+        setSnipActive(true)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [setSnipActive])
+
+
+  // ── Drag-and-Drop listener for local PDF files ────────────────────────────────────────────────
   useEffect(() => {
     let dragCounter = 0 // Track nested drag enter/leave events
 

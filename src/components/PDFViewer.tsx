@@ -16,39 +16,55 @@ interface Props {
 
 export default function PDFViewer({ src, height }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)   // ← ref for ResizeObserver
+  const renderTaskRef = useRef<pdfjsLib.RenderTask | null>(null)
+
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [containerWidth, setContainerWidth] = useState(480)  // ← tracked via ResizeObserver
+  const [zoom, setZoom] = useState(1)                        // ← user zoom multiplier
+
+  // ── Watch container width for resize ──────────────────────────────────────
+  useEffect(() => {
+    if (!containerRef.current) return
+    const obs = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width
+      if (w && w > 0) setContainerWidth(w)
+    })
+    obs.observe(containerRef.current)
+    return () => obs.disconnect()
+  }, [])
+
 
   // ── Load the PDF document ──────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
     setError(null)
+    setCurrentPage(1)
 
     // PDF.js accepts URLs and binary data, but not raw data URIs directly
     // We need to strip the base64 prefix for local files
-    let loadingTask
+    let loadingTask: pdfjsLib.PDFDocumentLoadingTask
     if (src.startsWith('data:')) {
       const base64 = src.split(',')[1]
       const binary = atob(base64)
       const bytes = new Uint8Array(binary.length)
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i)
-      }
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
       loadingTask = pdfjsLib.getDocument({ data: bytes })
     } else {
       loadingTask = pdfjsLib.getDocument(src)
     }
 
     loadingTask.promise
-      .then((doc) => {
+      .then(doc => {
         setPdfDoc(doc)
         setTotalPages(doc.numPages)
         setLoading(false)
       })
-      .catch((err) => {
+      .catch(err => {
         setError('Could not load PDF.')
         setLoading(false)
         console.error('[Pinboard] PDF load error:', err)
@@ -57,36 +73,42 @@ export default function PDFViewer({ src, height }: Props) {
     return () => { loadingTask.destroy() }
   }, [src])
 
-  // ── Render a single page onto the canvas ──────────────────────────────────
+  // ── Render page — re-runs on page change, resize, OR zoom change ───────────
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return
 
     let cancelled = false
 
-    pdfDoc.getPage(currentPage).then((page) => {
+    // Cancel any in-progress render before starting a new one
+    if (renderTaskRef.current) {
+      renderTaskRef.current.cancel()
+      renderTaskRef.current = null
+    }
+
+    pdfDoc.getPage(currentPage).then(page => {
       if (cancelled || !canvasRef.current) return
 
       const canvas = canvasRef.current
       const ctx = canvas.getContext('2d')!
-      // Scale to fill the window width
-      const viewport = page.getViewport({ scale: 1 })
-      const containerWidth = canvas.parentElement?.clientWidth || canvas.parentElement?.offsetWidth || 480
-      const scale = containerWidth / viewport.width
-      const scaledViewport = page.getViewport({ scale })
+      const baseViewport = page.getViewport({ scale: 1 })
 
-      canvas.width = scaledViewport.width
-      canvas.height = scaledViewport.height
+      // Scale to fit container width, then apply user zoom on top
+      const fitScale = containerWidth / baseViewport.width
+      const finalScale = fitScale * zoom
+      const viewport = page.getViewport({ scale: finalScale })
 
-      page.render({ canvasContext: ctx, viewport: scaledViewport, canvas: canvas })
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+
+      const task = page.render({ canvasContext: ctx, viewport, canvas })
+      renderTaskRef.current = task
+      task.promise.catch(() => {}) // cancelled renders throw — swallow silently
     })
 
     return () => { cancelled = true }
-  }, [pdfDoc, currentPage])
+  }, [pdfDoc, currentPage, containerWidth, zoom])  // ← containerWidth + zoom in deps
 
-  // ── Keyboard navigation ───────────────────────────────────────────────────
-  const goTo = (n: number) => {
-    setCurrentPage(Math.min(Math.max(1, n), totalPages))
-  }
+  const goTo = (n: number) => setCurrentPage(Math.min(Math.max(1, n), totalPages))
 
   if (loading || error) return (
     <div style={{ display: 'flex', flexDirection: 'column', height }}>
@@ -94,35 +116,68 @@ export default function PDFViewer({ src, height }: Props) {
     </div>
   )
 
+  const controlsHeight = 36  // combined bar for nav + zoom
+  const canvasAreaHeight = height - controlsHeight
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height }}>
+
       {/* Scrollable canvas area */}
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', background: '#111' }}>
+      <div
+        ref={containerRef}
+        style={{ flex: 1, height: canvasAreaHeight, overflowY: 'auto', overflowX: 'hidden', background: '#111' }}
+      >
         <canvas ref={canvasRef} style={{ display: 'block', maxWidth: '100%' }} />
       </div>
 
-      {/* Page controls */}
-      {totalPages > 1 && (
-        <div style={{
-          height: 30,
-          background: '#1B1B1B',
-          borderTop: '1px solid #2C2C2C',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-        }}>
+      {/* ── Controls bar: page nav + zoom ── */}
+      <div style={{
+        height: controlsHeight,
+        background: '#1B1B1B',
+        borderTop: '1px solid #2C2C2C',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 8px',
+        gap: 8,
+        flexShrink: 0,
+      }}>
+
+        {/* Page navigation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <NavButton onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1}>
             <ChevronLeft size={12} />
           </NavButton>
-          <span style={{ fontSize: 10, color: '#888', fontFamily: 'Courier Prime, monospace' }}>
+          <span style={{ fontSize: 10, color: '#888', fontFamily: 'Courier Prime, monospace', whiteSpace: 'nowrap' }}>
             {currentPage} / {totalPages}
           </span>
           <NavButton onClick={() => goTo(currentPage + 1)} disabled={currentPage >= totalPages}>
             <ChevronRight size={12} />
           </NavButton>
         </div>
-      )}
+
+        {/* Zoom slider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end' }}>
+          <span style={{ fontSize: 9, color: '#555', fontFamily: 'Courier Prime, monospace', whiteSpace: 'nowrap' }}>
+            {Math.round(zoom * 100)}%
+          </span>
+          <input
+            type="range"
+            min={0.5}
+            max={3}
+            step={0.1}
+            value={zoom}
+            onChange={e => setZoom(parseFloat(e.target.value))}
+            title="Zoom"
+            style={{
+              width: 72,
+              accentColor: '#4A4A4A',
+              cursor: 'pointer',
+            }}
+          />
+        </div>
+
+      </div>
     </div>
   )
 }

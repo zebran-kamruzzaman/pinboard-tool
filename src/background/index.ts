@@ -5,13 +5,14 @@ export type PinType = 'image' | 'pdf'
 export interface Pin {
   id: string
   type: PinType
-  src: string          // URL or base64 data URI for local files
+  src: string              // URL or base64 data URI for local files
   x: number
   y: number
   width: number
   height: number
   minimized: boolean
-  label?: string       // Optional display label (filename for PDFs)
+  pinnedToFront?: boolean  // Locks window above normal layer
+  label?: string           // Optional display label (filename for PDFs)
 }
 
 // ─── Message Types ────────────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ type Message =
   | { action: 'REMOVE_PIN'; id: string }
   | { action: 'UPDATE_PIN'; id: string; updates: Partial<Pin> }
   | { action: 'GET_PINS' }
+  | { action: 'CAPTURE_TAB' } // Screenshot for snip tool
 
 // ─── Storage Helpers ──────────────────────────────────────────────────────────
 
@@ -73,6 +75,22 @@ chrome.runtime.onMessage.addListener(
           await setPins(updated)
           sendResponse({ success: true })
           broadcastPinsUpdate(updated) 
+          break
+        }
+
+        // ── Snip tool: capture the visible tab and return as data URL ──
+        case 'CAPTURE_TAB': {
+          try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+            if (tab?.windowId !== undefined) {
+              const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' })
+              sendResponse({ dataUrl })
+            } else {
+              sendResponse({ error: 'No active tab found' })
+            }
+          } catch (err) {
+            sendResponse({ error: String(err) })
+          }
           break
         }
 
