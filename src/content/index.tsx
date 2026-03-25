@@ -1,4 +1,4 @@
-import pinboardCssUrl from '../styles/pinboard.css?url'
+import pinboardCssText from '../styles/pinboard.css?inline'
 import { createRoot } from 'react-dom/client'
 import PinboardApp from '../components/PinboardApp.tsx'
 
@@ -25,10 +25,9 @@ function mountPinboard() {
     fontLink.href = 'https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Playfair+Display:wght@600&display=swap'
     shadow.appendChild(fontLink)
 
-    const styleLink = document.createElement('link')
-    styleLink.rel = 'stylesheet'
-    styleLink.href = pinboardCssUrl
-    shadow.appendChild(styleLink)
+    const styleTag = document.createElement('style')
+    styleTag.textContent = pinboardCssText
+    shadow.appendChild(styleTag)
 
     const mountPoint = document.createElement('div')
     mountPoint.style.cssText = 'pointer-events: all;'

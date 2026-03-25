@@ -141,7 +141,7 @@ export default function PDFViewer({ src, height }: Props) {
           height: canvasAreaHeight,
           overflowY: 'auto',
           overflowX: 'auto',
-          background: '#111',
+          background: 'var(--pb-bg-dark)',
         }}
       >
         <canvas ref={canvasRef} style={{ display: 'block', maxWidth: zoom > 1 ? 'none' : '100%' }} />
@@ -150,8 +150,8 @@ export default function PDFViewer({ src, height }: Props) {
       {/* Controls: page nav + zoom */}
       <div style={{
         height: controlsHeight,
-        background: '#1B1B1B',
-        borderTop: '1px solid #2C2C2C',
+        background: 'var(--pb-bg)',
+        borderTop: '1px solid var(--pb-border)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -165,7 +165,7 @@ export default function PDFViewer({ src, height }: Props) {
           </NavButton>
           <span style={{
             fontSize: 10,
-            color: '#888',
+            color: 'var(--pb-text-muted)',
             fontFamily: 'Courier Prime, monospace',
             whiteSpace: 'nowrap',
           }}>
@@ -179,7 +179,7 @@ export default function PDFViewer({ src, height }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end' }}>
           <span style={{
             fontSize: 9,
-            color: '#555',
+            color: 'var(--pb-border-light)',
             fontFamily: 'Courier Prime, monospace',
             whiteSpace: 'nowrap',
           }}>
@@ -193,7 +193,7 @@ export default function PDFViewer({ src, height }: Props) {
             value={zoom}
             onChange={e => setZoom(parseFloat(e.target.value))}
             title="Zoom"
-            style={{ width: 72, accentColor: '#4A4A4A', cursor: 'pointer' }}
+            style={{ width: 72, accentColor: 'var(--pb-border-light)', cursor: 'pointer' }}
           />
         </div>
       </div>
@@ -208,7 +208,7 @@ function PDFState({ label, isError }: { label: string; isError?: boolean }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      color: isError ? '#FF6B6B' : '#888',
+      color: isError ? '#FF6B6B' : 'var(--pb-text-muted)',
       fontSize: 11,
       fontFamily: 'Courier Prime, monospace',
       textAlign: 'center',
@@ -231,7 +231,7 @@ function NavButton({ onClick, disabled, children }: {
       style={{
         background: 'none',
         border: 'none',
-        color: disabled ? '#333' : '#888',
+        color: disabled ? 'var(--pb-text-disabled)' : 'var(--pb-text-muted)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex',
         alignItems: 'center',

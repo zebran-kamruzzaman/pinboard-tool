@@ -4,17 +4,24 @@
 /* Google Fonts import for Shadow DOM */
 @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Playfair+Display:wght@400;600&display=swap');
 
-/* Custom Pinboard Design Tokens */
-@layer base {
-  :host {
+:host {
     --pb-bg: #1B1B1B;
     --pb-border: #2C2C2C;
-    --pb-border-light: #4A4A4A;
-    --pb-text: #E8E8E8;
-    --pb-text-muted: #888888;
+    --pb-border-light: #696969;
+    --pb-text: #ff0000;
+    --pb-text-muted: #ffbf00;
     --pb-accent: #FFFFFF;
+
+    --pb-bg-dark: #111111;        /* PDF canvas background */
+    --pb-text-dim: #666666;       /* resting button icon color */
+    --pb-text-disabled: #333333;  /* disabled nav button */
+
     font-family: 'Courier Prime', 'Courier New', monospace;
   }
+
+/* Custom Pinboard Design Tokens */
+@layer base {
+  
 }
 
 /* Floating window base styles */

@@ -35,17 +35,17 @@ export default function DropZoneOverlay({ visible, onDrop, onDragLeave }: Props)
             alignItems: 'center',
             justifyContent: 'center',
             gap: 12,
-            border: '1px dashed #4A4A4A',
+            border: '1px dashed var(--pb-border-light)',
             margin: 12,
             borderRadius: 4,
             pointerEvents: 'all',
           }}
         >
-          <FileText size={32} color="#4A4A4A" />
+          <FileText size={32} color="var(--pb-border-light)" />
           <span style={{
             fontFamily: 'Courier Prime, monospace',
             fontSize: 13,
-            color: '#888',
+            color: 'var(--pb-text-muted)',
             letterSpacing: '0.05em',
           }}>
             Drop PDF to pin

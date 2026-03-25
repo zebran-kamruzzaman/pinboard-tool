@@ -45,7 +45,7 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
     startPinY: number
   } | null>(null)
 
-  const handleHeaderMouseDown = (e: React.MouseEvent) => {
+  const handleWindowMouseDown = (e: React.MouseEvent) => {
     // Only trigger on left click, not button clicks inside the header
     if ((e.target as HTMLElement).closest('button')) return
     e.preventDefault()
@@ -89,7 +89,10 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
         zIndex,
       }}
       // No Framer drag — handled manually on the header above
-      onMouseDown={onFocus}
+      onMouseDown={(e) => {
+        onFocus();
+        if (pin.type === 'image') handleWindowMouseDown(e);
+      }}
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.88 }}
@@ -98,11 +101,13 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
       {/* ── Header Bar ── */}
       <div
         className="pb-drag-handle"
-        onMouseDown={handleHeaderMouseDown}
+        onMouseDown={(e) => {
+          if (pin.type === 'pdf') handleWindowMouseDown(e);
+        }}
         style={{
           height: headerHeight,
-          background: '#1B1B1B',
-          borderBottom: minimized ? 'none' : '1px solid #2C2C2C',
+          background: 'var(--pb-bg)',
+          borderBottom: minimized ? 'none' : '1px solid var(--pb-border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -111,11 +116,11 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
-          <GripHorizontal size={12} color="#4A4A4A" />
+          <GripHorizontal size={12} color="var(--pb-border-light)" />
           {pin.label && (
             <span style={{
               fontSize: 10,
-              color: '#888',
+              color: 'var(--pb-text-muted)',
               fontFamily: 'Courier Prime, monospace',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -152,7 +157,7 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
           width: '100%',
           height: pin.height - headerHeight,
           overflow: 'hidden',
-          background: '#1B1B1B',
+          background: 'var(--pb-bg)',
         }}>
           {pin.type === 'image' ? (
             <img
@@ -199,11 +204,11 @@ function HeaderButton({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: active ? '#2C2C2C' : hovered ? '#2C2C2C' : 'transparent',
+        background: active ? 'var(--pb-border)' : hovered ? 'var(--pb-border)' : 'transparent',
         border: '1px solid',
-        borderColor: active ? '#E8E8E8' : hovered ? '#4A4A4A' : 'transparent',
+        borderColor: active ? 'var(--pb-accent)' : hovered ? 'var(--pb-border-light)' : 'transparent',
         borderRadius: 2,
-        color: active ? '#E8E8E8' : hovered ? '#E8E8E8' : '#666',
+        color: active ? 'var(--pb-text)' : hovered ? 'var(--pb-text)' : 'var(--pb-text-dim)',
         cursor: 'pointer',
         width: 18, height: 18,
         display: 'flex',
@@ -255,9 +260,9 @@ function ResizeHandle({ pin, onUpdate }: {
       }}
     >
       <svg width="8" height="8" viewBox="0 0 8 8">
-        <circle cx="6" cy="6" r="1" fill="#4A4A4A" />
-        <circle cx="3" cy="6" r="1" fill="#4A4A4A" />
-        <circle cx="6" cy="3" r="1" fill="#4A4A4A" />
+        <circle cx="6" cy="6" r="1" fill="var(--pb-border-light)" />
+        <circle cx="3" cy="6" r="1" fill="var(--pb-border-light)" />
+        <circle cx="6" cy="3" r="1" fill="var(--pb-border-light)" />
       </svg>
     </div>
   )
