@@ -64,6 +64,21 @@ export default function PinboardApp() {
         visible={dropZoneVisible}
         onDrop={(file) => {
           setDropZoneVisible(false)
+
+          // ── File size guard ──────────────────────────────────────────────
+          // chrome.storage.local has a ~10MB limit per item.
+          // Base64 encoding adds ~33% overhead, so cap raw files at 7MB
+          // to stay safely under the limit with room for other pins.
+          const MAX_PDF_BYTES = 7 * 1024 * 1024 // 7MB
+          if (file.size > MAX_PDF_BYTES) {
+            alert(
+              `"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)}MB — ` +
+              `too large to pin. Files must be under 7MB.\n\n` +
+              `Tip: Use a PDF compressor (e.g. ilovepdf.com) to reduce the size.`
+            )
+            return
+          }
+          
           const reader = new FileReader()
           reader.onload = (e) => {
             if (!e.target?.result) return

@@ -7,10 +7,10 @@ import type { Pin as PinType } from '../background/index'
 
 interface Props {
   pin: PinType
-  zIndex: number                          // ← managed by PinboardApp
+  zIndex: number
   onClose: () => void
   onUpdate: (updates: Partial<PinType>) => void
-  onFocus: () => void                     // ← called on any interaction
+  onFocus: () => void
 }
 
 export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus }: Props) {
@@ -18,7 +18,6 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
   const y = useMotionValue(pin.y)
   const [minimized, setMinimized] = useState(pin.minimized)
   const headerHeight = 28
-
 
   // Sync position when another tab broadcasts an update
   useEffect(() => { x.set(pin.x) }, [pin.x, x])
@@ -31,9 +30,50 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
   }
 
   const handleTogglePin = () => {
-    const next = !pin.pinnedToFront
-    onUpdate({ pinnedToFront: next })
-    onFocus() // elevate within the pinned tier immediately
+    onUpdate({ pinnedToFront: !pin.pinnedToFront })
+    onFocus()
+  }
+
+  // ── Manual drag on header ────────────────────────────────────────────────
+  // Replaces Framer's `drag` prop entirely. Driving x/y motion values directly
+  // means React never re-renders during drag (Framer updates CSS transforms),
+  // and the resize handle can't interact with Framer's internal drag state.
+  const dragState = useRef<{
+    startMouseX: number
+    startMouseY: number
+    startPinX: number
+    startPinY: number
+  } | null>(null)
+
+  const handleHeaderMouseDown = (e: React.MouseEvent) => {
+    // Only trigger on left click, not button clicks inside the header
+    if ((e.target as HTMLElement).closest('button')) return
+    e.preventDefault()
+    onFocus()
+
+    dragState.current = {
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startPinX: x.get(),
+      startPinY: y.get(),
+    }
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragState.current) return
+      x.set(dragState.current.startPinX + ev.clientX - dragState.current.startMouseX)
+      y.set(dragState.current.startPinY + ev.clientY - dragState.current.startMouseY)
+    }
+
+    const onUp = () => {
+      if (!dragState.current) return
+      onUpdate({ x: x.get(), y: y.get() })
+      dragState.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
   }
 
   return (
@@ -41,19 +81,15 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
       className="pb-window"
       style={{
         position: 'fixed',
+        left: 0,
+        top: 0,
         x,
         y,
         width: pin.width,
         zIndex,
       }}
-      drag
-      dragMomentum={false}
-      dragElastic={0}
+      // No Framer drag — handled manually on the header above
       onMouseDown={onFocus}
-      onDragEnd={() => {
-        // x.get() / y.get() are the true final coordinates after drag
-        onUpdate({ x: x.get(), y: y.get() })
-      }}
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.88 }}
@@ -62,6 +98,7 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
       {/* ── Header Bar ── */}
       <div
         className="pb-drag-handle"
+        onMouseDown={handleHeaderMouseDown}
         style={{
           height: headerHeight,
           background: '#1B1B1B',
@@ -91,7 +128,6 @@ export default function FloatingWindow({ pin, zIndex, onClose, onUpdate, onFocus
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {/* Pin-to-front toggle */}
           <HeaderButton
             onClick={handleTogglePin}
             title={pin.pinnedToFront ? 'Unpin from front' : 'Pin to front'}
@@ -167,7 +203,6 @@ function HeaderButton({
         border: '1px solid',
         borderColor: active ? '#E8E8E8' : hovered ? '#4A4A4A' : 'transparent',
         borderRadius: 2,
-        // Active (pinned) state shows white, otherwise normal hover logic
         color: active ? '#E8E8E8' : hovered ? '#E8E8E8' : '#666',
         cursor: 'pointer',
         width: 18, height: 18,

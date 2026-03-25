@@ -1,52 +1,59 @@
 // src/components/PDFViewer.tsx
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-// Point PDF.js to its worker script
-// The worker must be a web-accessible resource
 pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.mjs')
 
-
 interface Props {
-  src: string    // URL or base64 data URI
+  src: string
   height: number
 }
 
 export default function PDFViewer({ src, height }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)   // ← ref for ResizeObserver
   const renderTaskRef = useRef<pdfjsLib.RenderTask | null>(null)
+  const observerRef = useRef<ResizeObserver | null>(null)
 
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [containerWidth, setContainerWidth] = useState(480)  // ← tracked via ResizeObserver
-  const [zoom, setZoom] = useState(1)                        // ← user zoom multiplier
+  const [containerWidth, setContainerWidth] = useState(480)
+  const [zoom, setZoom] = useState(1)
 
-  // ── Watch container width for resize ──────────────────────────────────────
-  useEffect(() => {
-    if (!containerRef.current) return
+  // ── Callback ref — attaches ResizeObserver only once the DOM node exists ──
+  // This fixes the bug where useEffect ran during the loading state, when
+  // containerRef.current was null, so the observer was never actually attached.
+  const containerCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    // Disconnect any previous observer if the node changes
+    if (observerRef.current) {
+      observerRef.current.disconnect()
+      observerRef.current = null
+    }
+    if (!node) return
+
+    // Read the initial width immediately on attach
+    const initialWidth = node.getBoundingClientRect().width
+    if (initialWidth > 0) setContainerWidth(initialWidth)
+
     const obs = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width
       if (w && w > 0) setContainerWidth(w)
     })
-    obs.observe(containerRef.current)
-    return () => obs.disconnect()
-  }, [])
+    obs.observe(node)
+    observerRef.current = obs
+  }, []) // stable — no deps needed
 
-
-  // ── Load the PDF document ──────────────────────────────────────────────────
+  // ── Load PDF document ──────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
     setError(null)
     setCurrentPage(1)
+    setZoom(1) // reset zoom when a new PDF loads
 
-    // PDF.js accepts URLs and binary data, but not raw data URIs directly
-    // We need to strip the base64 prefix for local files
     let loadingTask: pdfjsLib.PDFDocumentLoadingTask
     if (src.startsWith('data:')) {
       const base64 = src.split(',')[1]
@@ -73,13 +80,15 @@ export default function PDFViewer({ src, height }: Props) {
     return () => { loadingTask.destroy() }
   }, [src])
 
-  // ── Render page — re-runs on page change, resize, OR zoom change ───────────
+  // ── Render page ────────────────────────────────────────────────────────────
+  // Runs on: page change, container resize, zoom change.
+  // containerWidth drives fit-to-width. zoom multiplies on top of that.
+  // Changing page never resets zoom — that's intentional so zoom persists.
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return
 
     let cancelled = false
 
-    // Cancel any in-progress render before starting a new one
     if (renderTaskRef.current) {
       renderTaskRef.current.cancel()
       renderTaskRef.current = null
@@ -92,7 +101,9 @@ export default function PDFViewer({ src, height }: Props) {
       const ctx = canvas.getContext('2d')!
       const baseViewport = page.getViewport({ scale: 1 })
 
-      // Scale to fit container width, then apply user zoom on top
+      // Step 1: fit the page exactly to the container width (zoom = 1 baseline)
+      // Step 2: multiply by user zoom — this enlarges content beyond the window
+      //         which is fine since the canvas container has overflowY: auto
       const fitScale = containerWidth / baseViewport.width
       const finalScale = fitScale * zoom
       const viewport = page.getViewport({ scale: finalScale })
@@ -102,11 +113,11 @@ export default function PDFViewer({ src, height }: Props) {
 
       const task = page.render({ canvasContext: ctx, viewport, canvas })
       renderTaskRef.current = task
-      task.promise.catch(() => {}) // cancelled renders throw — swallow silently
+      task.promise.catch(() => {}) // swallow cancellation errors
     })
 
     return () => { cancelled = true }
-  }, [pdfDoc, currentPage, containerWidth, zoom])  // ← containerWidth + zoom in deps
+  }, [pdfDoc, currentPage, containerWidth, zoom])
 
   const goTo = (n: number) => setCurrentPage(Math.min(Math.max(1, n), totalPages))
 
@@ -116,21 +127,27 @@ export default function PDFViewer({ src, height }: Props) {
     </div>
   )
 
-  const controlsHeight = 36  // combined bar for nav + zoom
+  const controlsHeight = 36
   const canvasAreaHeight = height - controlsHeight
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height }}>
 
-      {/* Scrollable canvas area */}
+      {/* Canvas area — callback ref guarantees ResizeObserver attaches after load */}
       <div
-        ref={containerRef}
-        style={{ flex: 1, height: canvasAreaHeight, overflowY: 'auto', overflowX: 'hidden', background: '#111' }}
+        ref={containerCallbackRef}
+        style={{
+          flex: 1,
+          height: canvasAreaHeight,
+          overflowY: 'auto',
+          overflowX: 'auto',
+          background: '#111',
+        }}
       >
-        <canvas ref={canvasRef} style={{ display: 'block', maxWidth: '100%' }} />
+        <canvas ref={canvasRef} style={{ display: 'block', maxWidth: zoom > 1 ? 'none' : '100%' }} />
       </div>
 
-      {/* ── Controls bar: page nav + zoom ── */}
+      {/* Controls: page nav + zoom */}
       <div style={{
         height: controlsHeight,
         background: '#1B1B1B',
@@ -142,13 +159,16 @@ export default function PDFViewer({ src, height }: Props) {
         gap: 8,
         flexShrink: 0,
       }}>
-
-        {/* Page navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <NavButton onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1}>
             <ChevronLeft size={12} />
           </NavButton>
-          <span style={{ fontSize: 10, color: '#888', fontFamily: 'Courier Prime, monospace', whiteSpace: 'nowrap' }}>
+          <span style={{
+            fontSize: 10,
+            color: '#888',
+            fontFamily: 'Courier Prime, monospace',
+            whiteSpace: 'nowrap',
+          }}>
             {currentPage} / {totalPages}
           </span>
           <NavButton onClick={() => goTo(currentPage + 1)} disabled={currentPage >= totalPages}>
@@ -156,9 +176,13 @@ export default function PDFViewer({ src, height }: Props) {
           </NavButton>
         </div>
 
-        {/* Zoom slider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end' }}>
-          <span style={{ fontSize: 9, color: '#555', fontFamily: 'Courier Prime, monospace', whiteSpace: 'nowrap' }}>
+          <span style={{
+            fontSize: 9,
+            color: '#555',
+            fontFamily: 'Courier Prime, monospace',
+            whiteSpace: 'nowrap',
+          }}>
             {Math.round(zoom * 100)}%
           </span>
           <input
@@ -169,14 +193,9 @@ export default function PDFViewer({ src, height }: Props) {
             value={zoom}
             onChange={e => setZoom(parseFloat(e.target.value))}
             title="Zoom"
-            style={{
-              width: 72,
-              accentColor: '#4A4A4A',
-              cursor: 'pointer',
-            }}
+            style={{ width: 72, accentColor: '#4A4A4A', cursor: 'pointer' }}
           />
         </div>
-
       </div>
     </div>
   )
@@ -192,6 +211,8 @@ function PDFState({ label, isError }: { label: string; isError?: boolean }) {
       color: isError ? '#FF6B6B' : '#888',
       fontSize: 11,
       fontFamily: 'Courier Prime, monospace',
+      textAlign: 'center',
+      padding: '0 12px',
     }}>
       {label}
     </div>
